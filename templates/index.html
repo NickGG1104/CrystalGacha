@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>God's Favored Ones</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+    <style>
+        body {
+            background: radial-gradient(circle at 50% 0%, #fffdfa 0%, #f4ebd8 100%);
+            min-height: 100vh;
+            color: #5c4d3c; 
+            font-family: 'Helvetica Neue', 'PingFang TC', Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.55);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 50px rgba(218, 165, 32, 0.08), 
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+        }
+        
+        .crystal-ball-container {
+            position: relative;
+            width: 350px; height: 350px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.05) 60%),
+                        radial-gradient(circle at 70% 70%, rgba(218, 165, 32, 0.1) 0%, rgba(0, 0, 0, 0) 80%);
+            box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.8),
+                        0 15px 35px rgba(139, 90, 43, 0.15),
+                        0 0 80px rgba(251, 191, 36, 0.25);
+            overflow: hidden; 
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            z-index: 10;
+        }
+        .crystal-ball-highlight {
+            position: absolute;
+            top: 8%; left: 12%;
+            width: 80px; height: 45px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            filter: blur(6px); transform: rotate(-20deg); pointer-events: none; 
+        }
+
+        .crystal-base {
+            width: 240px; height: 50px;
+            background: linear-gradient(to bottom, #fefce8 0%, #e6dfc8 100%);
+            border-radius: 50% / 100% 100% 0 0;
+            margin-top: -25px; 
+            box-shadow: 0 15px 25px rgba(139, 90, 43, 0.2), inset 0 4px 10px rgba(255,255,255,0.8);
+            position: relative; z-index: 5;
+            border-bottom: 6px solid #d4af37; 
+        }
+        .crystal-base::after {
+            content: ''; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+            width: 280px; height: 12px;
+            background: linear-gradient(to right, #bda55d, #e5d08e, #bda55d); 
+            border-radius: 10px; box-shadow: 0 10px 20px rgba(139, 90, 43, 0.3);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(218, 165, 32, 0.3); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(218, 165, 32, 0.6); }
+        .list-enter-active, .list-leave-active { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .list-enter-from { opacity: 0; transform: translateX(-30px); }
+        .list-leave-to { opacity: 0; transform: translateX(30px); }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4 selection:bg-amber-200 selection:text-amber-900">
+
+    <div id="app" class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="glass-panel p-8 flex flex-col h-[650px] lg:col-span-1">
+            <h2 class="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-amber-600 to-yellow-500 flex items-center gap-2 drop-shadow-sm">
+                God's Favored Ones
+            </h2>
+            
+            <div class="flex gap-2 mb-4">
+                <input 
+                    v-model="newName" @keyup.enter="addParticipant" type="text" placeholder="輸入姓名..." 
+                    class="flex-1 bg-white/70 border-2 border-amber-100 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-400 focus:bg-white transition-all placeholder:text-amber-900/40 text-amber-950 font-medium shadow-inner"
+                >
+                <button @click="addParticipant" class="bg-gradient-to-br from-amber-400 to-yellow-600 hover:from-amber-300 hover:to-yellow-500 text-white px-5 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-[0_4px_15px_rgba(245,158,11,0.4)]">
+                    ＋
+                </button>
+            </div>
+
+            <div class="flex justify-between items-center bg-white/40 p-3 rounded-xl border border-amber-100 mb-4 shadow-sm">
+                <div class="flex items-center gap-2">
+                    <label class="font-bold text-amber-800/80 text-sm">抽出人數</label>
+                    <input type="number" v-model.number="drawCount" min="1" :max="eligibleCount || 1" class="w-16 text-center bg-white border border-amber-200 rounded-lg py-1 text-amber-900 font-bold focus:outline-none focus:border-amber-400">
+                </div>
+                <button @click="resetDrawStatus" class="text-sm font-bold text-amber-600 hover:text-white border-2 border-amber-300 hover:bg-amber-400 px-3 py-1.5 rounded-lg transition-colors">
+                    重置名單
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                <transition-group name="list" tag="div">
+                    <div v-for="p in participants" :key="p.id" 
+                         class="flex justify-between items-center p-4 rounded-xl border transition-all group"
+                         :class="p.is_drawn ? 'bg-amber-50/50 border-amber-50 opacity-60 grayscale-[30%]' : 'bg-white/60 border-amber-50 hover:border-amber-300 hover:shadow-md hover:bg-white/90'">
+                        
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold" :class="p.is_drawn ? 'text-amber-800/60 line-through' : 'text-amber-900'">{{ p.name }}</span>
+                            <span v-if="p.is_drawn" class="text-[10px] font-bold text-amber-600 bg-amber-100/80 px-2 py-0.5 rounded-full">已抽出</span>
+                        </div>
+                        
+                        <button @click="removeParticipant(p.id)" class="text-amber-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity font-bold px-2 text-lg">✕</button>
+                    </div>
+                </transition-group>
+                <div v-if="participants.length === 0" class="text-amber-700/50 text-center mt-16 flex flex-col items-center gap-4 font-medium">
+                    <span>名單空空如也，請先加入抽籤人員！</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t-2 border-amber-100/50 text-sm font-bold text-amber-800/60 flex justify-between items-center">
+                <span>剩餘未抽</span>
+                <span class="text-xl font-black text-amber-600">{{ eligibleCount }} / {{ participants.length }}</span>
+            </div>
+        </div>
+
+        <div class="glass-panel p-8 flex flex-col items-center justify-center lg:col-span-2 min-h-[650px] relative">
+            
+            <div class="flex items-end justify-center relative mt-10">
+                <div class="flex flex-col items-center relative">
+                    <div class="crystal-ball-container">
+                        <canvas id="ball-canvas"></canvas>
+                        <div class="crystal-ball-highlight"></div>
+                    </div>
+                    <div class="crystal-base"></div>
+                </div>
+
+                <div 
+                    class="relative ml-4 mb-6 cursor-pointer group" 
+                    @click="startDraw"
+                    :class="{ 'pointer-events-none opacity-50': isDrawing || eligibleCount === 0 || eligibleCount < drawCount }"
+                >
+                    <div class="w-12 h-24 bg-gradient-to-b from-amber-50 to-orange-100 rounded-lg shadow-[0_10px_20px_rgba(139,90,43,0.15)] border border-amber-200 flex justify-center pt-2 relative z-20">
+                        <div class="w-2 h-16 bg-amber-900/80 rounded-full shadow-inner"></div>
+                    </div>
+                    <div 
+                        class="absolute bottom-12 left-1/2 -translate-x-1/2 w-4 h-36 bg-gradient-to-r from-yellow-200 via-amber-400 to-yellow-600 rounded-t-full origin-bottom transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] z-10 border-x border-yellow-500/30"
+                        :class="isDrawing ? 'rotate-[65deg] translate-y-2' : 'group-hover:-rotate-6'"
+                    >
+                        <div class="absolute -top-8 -left-5 w-14 h-14 bg-gradient-to-br from-yellow-300 via-amber-500 to-orange-600 rounded-full shadow-[0_0_20px_rgba(245,158,11,0.6)] border-2 border-amber-200 group-hover:brightness-110 group-active:brightness-90">
+                            <div class="absolute top-2 left-2 w-4 h-4 bg-white/60 rounded-full filter blur-[2px]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-16 h-8 text-center w-full">
+                <p v-if="eligibleCount === 0 && participants.length > 0" class="text-amber-800/60 font-medium text-sm bg-white/50 px-6 py-2 rounded-full inline-block border border-amber-100">
+                    所有人皆已抽出，請點擊左側「重置名單」
+                </p>
+                <p v-else-if="eligibleCount < drawCount && !isDrawing" class="text-amber-800/60 font-medium text-sm bg-white/50 px-6 py-2 rounded-full inline-block border border-amber-100">
+                    剩餘人數不足以抽出指定數量
+                </p>
+                <p v-else-if="isDrawing" class="text-amber-600 text-lg font-black tracking-widest animate-pulse drop-shadow-sm">
+                    靈感攪拌中
+                </p>
+                <p v-else-if="eligibleCount > 0" class="text-amber-600/90 text-lg font-bold tracking-widest animate-bounce cursor-pointer drop-shadow-sm" @click="startDraw">
+                    誰是天選之人？
+                </p>
+            </div>
+
+            <transition 
+                enter-active-class="animate__animated animate__zoomIn"
+                leave-active-class="animate__animated animate__fadeOut"
+            >
+                <div v-if="finalWinners.length > 0" class="absolute inset-0 flex items-center justify-center z-50 bg-white/40 backdrop-blur-md rounded-[1.5rem]">
+                    <div class="bg-gradient-to-br from-amber-50 to-white px-16 py-10 rounded-[2.5rem] shadow-[0_20px_80px_rgba(218,165,32,0.3)] border-4 border-amber-200 text-center transform hover:scale-105 transition-transform max-w-2xl w-full mx-8">
+                        <p class="text-sm text-amber-600 mb-6 font-bold tracking-[0.3em] uppercase opacity-80">上帝的寵兒</p>
+                        
+                        <div class="flex flex-wrap justify-center gap-x-8 gap-y-4 max-h-[40vh] overflow-y-auto custom-scrollbar px-4 pb-4">
+                            <h1 v-for="winner in finalWinners" :key="winner" class="text-5xl md:text-6xl font-black bg-clip-text text-transparent bg-gradient-to-b from-amber-500 to-yellow-600 drop-shadow-md">
+                                {{ winner }}
+                            </h1>
+                        </div>
+
+                        <button @click="finalWinners = []" class="mt-8 text-amber-700/60 hover:text-amber-600 font-bold underline underline-offset-4 text-sm transition-colors">
+                            優雅地關閉，準備下一輪
+                        </button>
+                    </div>
+                </div>
+            </transition>
+            
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+        const { Engine, Render, Runner, Bodies, Composite, World, Vector } = Matter;
+
+        createApp({
+            setup() {
+                const participants = ref([]);
+                const newName = ref('');
+                const isDrawing = ref(false);
+                const finalWinners = ref([]); // 改為陣列儲存多位得獎者
+                const drawCount = ref(1); // 預設抽出人數
+
+                // 計算尚未抽出的有效人數
+                const eligibleCount = computed(() => {
+                    return participants.value.filter(p => !p.is_drawn).length;
+                });
+
+                let engine, render, runner;
+                let balls = []; 
+                const canvasSize = 350; 
+
+                const ballColors = ['#fef3c7', '#fde68a', '#fbbf24', '#f59e0b', '#ffffff', '#fffbeb', '#e2e8f0'];
+
+                const initPhysicalEngine = () => {
+                    const canvas = document.getElementById('ball-canvas');
+                    engine = Engine.create({ gravity: { x: 0, y: 1.2 } }); 
+                    
+                    render = Render.create({
+                        canvas: canvas, engine: engine,
+                        options: { width: canvasSize, height: canvasSize, background: 'transparent', wireframes: false, pixelRatio: window.devicePixelRatio }
+                    });
+
+                    const walls = createCircleWalls(canvasSize/2, canvasSize/2, canvasSize/2, 50);
+                    World.add(engine.world, walls);
+
+                    Render.run(render);
+                    runner = Runner.create();
+                    Runner.run(runner, engine);
+                };
+
+                const createCircleWalls = (x, y, radius, sides) => {
+                    const walls = [];
+                    const theta = (2 * Math.PI) / sides;
+                    const wallThickness = 500; 
+                    for (let i = 0; i < sides; i++) {
+                        const angle = i * theta;
+                        const cx = x + (radius + wallThickness/2) * Math.cos(angle);
+                        const cy = y + (radius + wallThickness/2) * Math.sin(angle);
+                        walls.push(Bodies.rectangle(cx, cy, wallThickness, radius * theta * 2, { isStatic: true, angle: angle, render: { visible: false } }));
+                    }
+                    return walls;
+                };
+
+                const syncBallsWithParticipants = () => {
+                    if (!engine) return;
+                    // 只生成「尚未抽出」的小球
+                    const currentCount = eligibleCount.value;
+                    const ballCount = balls.length;
+
+                    if (currentCount > ballCount) {
+                        for (let i = 0; i < currentCount - ballCount; i++) addBall();
+                    } else if (currentCount < ballCount) {
+                        // 從陣列尾端移除多餘的球
+                        const removedBalls = balls.splice(currentCount, ballCount - currentCount);
+                        World.remove(engine.world, removedBalls);
+                    }
+                };
+
+                const addBall = () => {
+                    const radius = 13; 
+                    const x = canvasSize / 2 + (Math.random() - 0.5) * 100;
+                    const y = canvasSize / 3;
+                    const ball = Bodies.circle(x, y, radius, {
+                        restitution: 0.75, friction: 0.005, density: 0.012,
+                        render: {
+                            fillStyle: ballColors[Math.floor(Math.random() * ballColors.length)],
+                            strokeStyle: 'rgba(218, 165, 32, 0.4)', lineWidth: 1.5 
+                        }
+                    });
+                    balls.push(ball);
+                    World.add(engine.world, ball);
+                };
+
+                watch(participants, () => { nextTick(syncBallsWithParticipants); }, { deep: true });
+
+                const fetchParticipants = async () => {
+                    try {
+                        const res = await axios.get('/api/participants');
+                        participants.value = res.data;
+                    } catch (error) { console.error('獲取名單失敗:', error); }
+                };
+
+                const addParticipant = async () => {
+                    const name = newName.value.trim();
+                    if (!name) return;
+                    try {
+                        const res = await axios.post('/api/participants', { name });
+                        participants.value.push(res.data);
+                        newName.value = '';
+                    } catch (error) { alert('新增失敗'); }
+                };
+
+                const removeParticipant = async (id) => {
+                    try {
+                        await axios.delete(`/api/participants/${id}`);
+                        participants.value = participants.value.filter(p => p.id !== id);
+                    } catch (error) { alert('刪除失敗'); }
+                };
+
+                // 新增：重置所有人的抽籤狀態
+                const resetDrawStatus = async () => {
+                    if(participants.value.length === 0) return;
+                    try {
+                        await axios.post('/api/reset');
+                        await fetchParticipants(); // 重新獲取名單更新狀態
+                        finalWinners.value = [];
+                    } catch (error) { alert('重置失敗'); }
+                };
+
+                const startDraw = async () => {
+                    if (eligibleCount.value < drawCount.value || isDrawing.value) return;
+                    
+                    isDrawing.value = true;
+                    finalWinners.value = [];
+                    
+                    let actualWinners = [];
+                    try {
+                        // 傳送抽出數量給後端
+                        const res = await axios.post('/api/draw', { count: drawCount.value });
+                        actualWinners = res.data.winners;
+                    } catch (error) {
+                        alert(error.response?.data?.error || '抽籤發生錯誤！');
+                        isDrawing.value = false;
+                        return;
+                    }
+
+                    const shakeInterval = setInterval(() => {
+                        balls.forEach(ball => {
+                            if (Matter.Body.getSpeed(ball) > 16) Matter.Body.setSpeed(ball, 16);
+                            const force = Vector.create((Math.random() - 0.5) * 0.035, -Math.random() * 0.045 - 0.01);
+                            Matter.Body.applyForce(ball, ball.position, force);
+
+                            if (ball.position.y > canvasSize + 50 || ball.position.y < -50 || ball.position.x > canvasSize + 50 || ball.position.x < -50) {
+                                Matter.Body.setPosition(ball, { x: canvasSize / 2, y: canvasSize / 2 });
+                                Matter.Body.setVelocity(ball, { x: 0, y: 0 });
+                            }
+                        });
+                    }, 50);
+
+                    setTimeout(async () => {
+                        clearInterval(shakeInterval);
+                        isDrawing.value = false;
+                        finalWinners.value = actualWinners;
+                        // 抽籤結束後重新獲取名單，這樣 UI 上被抽過的人就會被標記，水晶球裡的小球也會自動減少
+                        await fetchParticipants();
+                    }, 3000); 
+                };
+
+                onMounted(async () => {
+                    initPhysicalEngine();
+                    await fetchParticipants(); 
+                });
+
+                return {
+                    participants, newName, isDrawing, finalWinners, drawCount, eligibleCount,
+                    addParticipant, removeParticipant, resetDrawStatus, startDraw
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
